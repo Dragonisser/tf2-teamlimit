@@ -4,8 +4,7 @@
 #pragma newdecls required
 #pragma semicolon 1
 
-public Plugin myinfo =
-{
+public Plugin myinfo = {
 	name = "Teamlimit",
 	author = "Dragonisser",
 	description = "Prevents joining a team at a given limit",
@@ -15,9 +14,15 @@ public Plugin myinfo =
 
 ConVar sm_team_joinlimit;
 ConVar g_cvMustJoinTeam;
+int team_spec = 0;
+int team_red = 0;
+int team_blu = 0;
+int team_count = 0;
 
-public void OnPluginStart()
-{
+TFTeam team_new = 0;
+TFTeam team_old = 0;
+
+public void OnPluginStart() {
 	HookEvent("player_team", EventPlayerTeam);
 	HookEvent("game_start", EventGameStart);
 	HookEvent("round_start", EventRoundStart);
@@ -25,23 +30,21 @@ public void OnPluginStart()
 	RegAdminCmd("sm_LimitInfo", Command_LimitInfo, ADMFLAG_SLAY);
 	RegAdminCmd("sm_SetTeamLimit", Command_SetTeamLimit, ADMFLAG_SLAY);
 	
-	g_cvMustJoinTeam = FindConVar("mp_humans_must_join_team");
+	AddCommandListener(OnTeamChangeRequested, "jointeam");
+
 	sm_team_joinlimit = CreateConVar("sm_team_joinlimit", "12", "Default total teamlimit");
 	//sm_team_joinlimit.AddChangeHook(OnTeamlimitChanged);
 	CreateConVar("sm_tl_version", "1.0", "Version of Plugin. Do not change!");
 	AutoExecConfig(true, "plugin_teamlimit");
 }
 
-public Action Command_LimitInfo(int client, int args)
-{
-	char strJoinTeam[64];
+public Action Command_LimitInfo(int client, int args) {
 	char strTeamName[64];
-	GetConVarString(g_cvMustJoinTeam, strJoinTeam, sizeof(strJoinTeam));
 	int team_joinlimit = FindConVar("sm_team_joinlimit").IntValue;
-	int team_spec = GetTeamClientCount(1);
-	int team_red = GetTeamClientCount(2);
-	int team_blu = GetTeamClientCount(3);
-	int team_count = team_blu + team_red;
+	team_spec = GetTeamClientCount(1);
+	team_red = GetTeamClientCount(2);
+	team_blu = GetTeamClientCount(3);
+	team_count = team_blu + team_red;
 	int client_score = GetEntProp(GetPlayerResourceEntity(), Prop_Send, "m_iTotalScore", _, client);
 	TFTeam client_team = TF2_GetClientTeam(client);
 	GetTeamName(view_as<int>(client_team), strTeamName, sizeof(strTeamName));
@@ -53,14 +56,12 @@ public Action Command_LimitInfo(int client, int args)
 	ReplyToCommand(client, "[SM] team_blu: %d", team_blu);
 	ReplyToCommand(client, "[SM] team_red: %d", team_red);
 	ReplyToCommand(client, "[SM] team_count: %d / sm_team_joinlimit: %d", team_count, team_joinlimit);
-	ReplyToCommand(client, "[SM] mp_humans_must_join_team: %s", strJoinTeam);
 	ReplyToCommand(client, "#######################################");
 	
 	return Plugin_Handled;
 }
 
-public Action Command_SetTeamLimit(int client, int args)
-{
+public Action Command_SetTeamLimit(int client, int args) {
 	char arg1[32];
 	GetCmdArg(1, arg1, sizeof(arg1));
 	
@@ -68,9 +69,9 @@ public Action Command_SetTeamLimit(int client, int args)
 	ReplyToCommand(client, "[SM] Set TeamLimit to %d", StringToInt(arg1));
 	
 	sm_team_joinlimit = FindConVar("sm_team_joinlimit");
-	int team_red = GetTeamClientCount(2);
-	int team_blu = GetTeamClientCount(3);
-	int team_count = team_blu + team_red;
+	team_red = GetTeamClientCount(2);
+	team_blu = GetTeamClientCount(3);
+	team_count = team_blu + team_red;
 	
 	int[][] scoreTable_red = new int[MAXPLAYERS][2], scoreTable_blue = new int[MAXPLAYERS][2];
 	
@@ -100,7 +101,6 @@ public Action Command_SetTeamLimit(int client, int args)
 
 	if(team_count < sm_team_joinlimit.IntValue){
 		PrintToChatAll("[TL] Teams are no longer full (%d/%d).", team_count, sm_team_joinlimit.IntValue);
-		SetConVarString(g_cvMustJoinTeam, "any");
 	} else {
 		
 		int player_overlimit = team_count - sm_team_joinlimit.IntValue;
@@ -130,7 +130,6 @@ public Action Command_SetTeamLimit(int client, int args)
 		}
 		
 		PrintToChatAll("[TL] Teams are now full (%d/%d).", team_count - player_overlimit, sm_team_joinlimit.IntValue);
-		SetConVarString(g_cvMustJoinTeam, "spectator");
 	}
 	return Plugin_Handled;
 }
@@ -153,48 +152,36 @@ bool IsEven(int iNum) {
 public Action EventGameStart(Event event, const char[] name, bool dontBroadcast) {
 	
 	sm_team_joinlimit = FindConVar("sm_team_joinlimit");
-	int team_red = GetTeamClientCount(2);
-	int team_blu = GetTeamClientCount(3);
-	int team_count = team_blu + team_red;
+	team_red = GetTeamClientCount(2);
+	team_blu = GetTeamClientCount(3);
+	team_count = team_blu + team_red;
 	
 	if(team_count < sm_team_joinlimit.IntValue){
 		PrintToChatAll("[TL] Teams are no longer full (%d/%d).", team_count, sm_team_joinlimit.IntValue);
-		SetConVarString(g_cvMustJoinTeam, "any");
 	} else {
 		PrintToChatAll("[TL] Teams are now full (%d/%d).", team_count, sm_team_joinlimit.IntValue);
-		SetConVarString(g_cvMustJoinTeam, "spectator");
 	}
 }
 public Action EventRoundStart(Event event, const char[] name, bool dontBroadcast) {
 	
 	sm_team_joinlimit = FindConVar("sm_team_joinlimit");
-	int team_red = GetTeamClientCount(2);
-	int team_blu = GetTeamClientCount(3);
-	int team_count = team_blu + team_red;
+	team_red = GetTeamClientCount(2);
+	team_blu = GetTeamClientCount(3);
+	team_count = team_blu + team_red;
 	
 	if(team_count < sm_team_joinlimit.IntValue){
 		PrintToChatAll("[TL] Teams are no longer full (%d/%d).", team_count, sm_team_joinlimit.IntValue);
-		SetConVarString(g_cvMustJoinTeam, "any");
 	} else {
 		PrintToChatAll("[TL] Teams are now full (%d/%d).", team_count, sm_team_joinlimit.IntValue);
-		SetConVarString(g_cvMustJoinTeam, "spectator");
 	}
 }
 
-public Action EventPlayerTeam(Event event, const char[] name, bool dontBroadcast)
-{
-	char value[64];
-	g_cvMustJoinTeam = FindConVar("mp_humans_must_join_team");
-	GetConVarString(g_cvMustJoinTeam, value, sizeof(value));
+
+
+public Action OnTeamChangeRequested(int client, const char[] name, int argc) {
 	sm_team_joinlimit = FindConVar("sm_team_joinlimit");
-	int team_red = GetTeamClientCount(2);
-	int team_blu = GetTeamClientCount(3);
-	TFTeam team_new = view_as<TFTeam>(GetEventInt(event, "team"));
-	TFTeam team_old = view_as<TFTeam>(GetEventInt(event, "oldteam"));
+
 	int team_remove = 0;
-	
-	
-	
 	
 	if(team_new == TFTeam_Red){
 		team_red = team_red + 1;
@@ -210,22 +197,16 @@ public Action EventPlayerTeam(Event event, const char[] name, bool dontBroadcast
 	
 	int team_count = team_blu + team_red + team_remove;
 
-	if(team_count >= sm_team_joinlimit.IntValue){
-		//Change cvar "mp_humans_must_join_team" to "spectator"
-		if(StrEqual(value, "any", false)){ 
-			PrintToChatAll("[TL] Teams are now full (%d/%d).", team_count, sm_team_joinlimit.IntValue);
-			SetConVarString(g_cvMustJoinTeam, "spectator");
-		} else {
-			SetConVarString(g_cvMustJoinTeam, "spectator");
-		}
-		
-	} else {
-		//Change cvar "mp_humans_must_join_team" to "any"
-		if(StrEqual(value, "spectator", false)){
-			PrintToChatAll("[TL] Teams are no longer full (%d/%d).", team_count, sm_team_joinlimit.IntValue);
-			SetConVarString(g_cvMustJoinTeam, "any");
-		} else {
-			SetConVarString(g_cvMustJoinTeam, "any");
-		}
+	if (team_count == sm_team_joinlimit) {
+		return Plugin_Handled;
 	}
+
+}
+
+public Action EventPlayerTeam(Event event, const char[] name, bool dontBroadcast) {
+	team_red = GetTeamClientCount(2);
+	team_blu = GetTeamClientCount(3);
+
+	TFTeam team_new = view_as<TFTeam>(GetEventInt(event, "team"));
+	TFTeam team_old = view_as<TFTeam>(GetEventInt(event, "oldteam"));
 }
