@@ -2,13 +2,15 @@
 A sourcemod plugin. You can use it to limit the amount of people who can play without changing maxplayers
 
 
-Config:
-
+**Config:**
+```
 sm_team_joinlimit <value>	- Default: 12
+```
 
 
-Commands:
+**Commands:**
+```
+sm_LimitInfo - General debug information. Check console.
 
-sm_LimitInfo 				- General debug information. Check console.
-
-sm_SetTeamLimit <value>		- Sets the teamlimit in total. 0-[INT_MAX]
+sm_SetTeamLimit <value>	- Sets the teamlimit in total. 0-[INT_MAX]
+```
