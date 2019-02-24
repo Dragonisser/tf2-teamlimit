@@ -8,19 +8,20 @@ public Plugin myinfo = {
 	name = "Teamlimit",
 	author = "Dragonisser",
 	description = "Prevents joining a team at a given limit",
-	version = "1.0",
+	version = "1.1",
 	url = "http://www.sourcemod.net/"
 };
 
 ConVar sm_team_joinlimit;
-ConVar g_cvMustJoinTeam;
+ConVar sm_tl_debug;
+
 int team_spec = 0;
 int team_red = 0;
 int team_blu = 0;
 int team_count = 0;
 
-TFTeam team_new = 0;
-TFTeam team_old = 0;
+TFTeam team_new;
+TFTeam team_old;
 
 public void OnPluginStart() {
 	HookEvent("player_team", EventPlayerTeam);
@@ -32,9 +33,10 @@ public void OnPluginStart() {
 	
 	AddCommandListener(OnTeamChangeRequested, "jointeam");
 
-	sm_team_joinlimit = CreateConVar("sm_team_joinlimit", "12", "Default total teamlimit");
+	sm_team_joinlimit = CreateConVar("sm_team_joinlimit", "24", "Default total teamlimit");
 	//sm_team_joinlimit.AddChangeHook(OnTeamlimitChanged);
-	CreateConVar("sm_tl_version", "1.0", "Version of Plugin. Do not change!");
+	CreateConVar("sm_tl_version", "1.1", "Version of Plugin. Do not change!");
+	CreateConVar("sm_tl_debug", "0.0", "Debug mode");
 	AutoExecConfig(true, "plugin_teamlimit");
 }
 
@@ -84,11 +86,11 @@ public Action Command_SetTeamLimit(int client, int args) {
 			int score = GetEntProp(GetPlayerResourceEntity(), Prop_Send, "m_iTotalScore", _, i);
 			int team = GetClientTeam(i);
 		
-			if(team == 2) {
+			if (team == 2) {
 				scoreTable_red[numValidScores_red][0] = i;
 				scoreTable_red[numValidScores_red][1] = score;
 				numValidScores_red++;
-			} else if(team == 3) {
+			} else if (team == 3) {
 				scoreTable_blue[numValidScores_blue][0] = i;
 				scoreTable_blue[numValidScores_blue][1] = score;
 				numValidScores_blue++;
@@ -99,16 +101,16 @@ public Action Command_SetTeamLimit(int client, int args) {
 	SortCustom2D(scoreTable_red, numValidScores_red, MySortingFunc);
 	SortCustom2D(scoreTable_blue, numValidScores_blue, MySortingFunc);
 
-	if(team_count < sm_team_joinlimit.IntValue){
+	if (team_count < sm_team_joinlimit.IntValue) {
 		PrintToChatAll("[TL] Teams are no longer full (%d/%d).", team_count, sm_team_joinlimit.IntValue);
 	} else {
 		
 		int player_overlimit = team_count - sm_team_joinlimit.IntValue;
 		int team_red_spec = 0, team_blue_spec = 0;
 		
-		if(player_overlimit == 1) {
+		if (player_overlimit == 1) {
 			team_blue_spec = 1;
-		} else if(IsEven(player_overlimit)) {
+		} else if (IsEven(player_overlimit)) {
 			team_red_spec = player_overlimit / 2;
 			team_blue_spec = player_overlimit / 2;
 		} else {
@@ -134,21 +136,6 @@ public Action Command_SetTeamLimit(int client, int args) {
 	return Plugin_Handled;
 }
 
-public int MySortingFunc(int[] a, int[] b, const int[][] table, Handle handle) {
-    int aScore = a[1], bScore = b[1];
-    
-    if (aScore > bScore) {
-        return -1;
-    } else if (aScore < bScore) {
-        return 1;
-    }
-    return 0;
-}
-
-bool IsEven(int iNum) { 
-    return iNum % 2 == 0; 
-}
-
 public Action EventGameStart(Event event, const char[] name, bool dontBroadcast) {
 	
 	sm_team_joinlimit = FindConVar("sm_team_joinlimit");
@@ -156,7 +143,7 @@ public Action EventGameStart(Event event, const char[] name, bool dontBroadcast)
 	team_blu = GetTeamClientCount(3);
 	team_count = team_blu + team_red;
 	
-	if(team_count < sm_team_joinlimit.IntValue){
+	if (team_count < sm_team_joinlimit.IntValue) {
 		PrintToChatAll("[TL] Teams are no longer full (%d/%d).", team_count, sm_team_joinlimit.IntValue);
 	} else {
 		PrintToChatAll("[TL] Teams are now full (%d/%d).", team_count, sm_team_joinlimit.IntValue);
@@ -169,7 +156,7 @@ public Action EventRoundStart(Event event, const char[] name, bool dontBroadcast
 	team_blu = GetTeamClientCount(3);
 	team_count = team_blu + team_red;
 	
-	if(team_count < sm_team_joinlimit.IntValue){
+	if (team_count < sm_team_joinlimit.IntValue) {
 		PrintToChatAll("[TL] Teams are no longer full (%d/%d).", team_count, sm_team_joinlimit.IntValue);
 	} else {
 		PrintToChatAll("[TL] Teams are now full (%d/%d).", team_count, sm_team_joinlimit.IntValue);
@@ -180,33 +167,108 @@ public Action EventRoundStart(Event event, const char[] name, bool dontBroadcast
 
 public Action OnTeamChangeRequested(int client, const char[] name, int argc) {
 	sm_team_joinlimit = FindConVar("sm_team_joinlimit");
+	team_red = GetTeamClientCount(2);
+	team_blu = GetTeamClientCount(3);
 
 	int team_remove = 0;
 	
-	if(team_new == TFTeam_Red){
+	char arg1[32];
+	GetCmdArg(1, arg1, sizeof(arg1));
+
+	if (strcmp(arg1, "red") == 0) {
+		team_new = TFTeam_Red;
+	} else if (strcmp(arg1, "blue") == 0) {
+		team_new = TFTeam_Blue;
+	} else if (strcmp(arg1, "spectate") == 0) {
+		team_new = TFTeam_Spectator;
+	} else if (strcmp(arg1, "unassigned") == 0) {
+		team_new = TFTeam_Unassigned;
+	}
+	team_old = TF2_GetClientTeam(client);
+
+	if (team_new == TFTeam_Red) {
 		team_red = team_red + 1;
-	} else if(team_new == TFTeam_Blue){
+		if (team_old == TFTeam_Blue) {
+			team_blu = team_blu -1;
+		}
+	} else if (team_new == TFTeam_Blue) {
 		team_blu = team_blu + 1;
-	} else if(team_new == TFTeam_Spectator || team_new == TFTeam_Unassigned){
-		if(team_old == TFTeam_Red || team_old == TFTeam_Blue){
+		if (team_old == TFTeam_Red) {
+			team_red = team_red - 1;
+		}
+	} else if (team_new == TFTeam_Spectator || team_new == TFTeam_Unassigned) {
+		if (team_old == TFTeam_Red || team_old == TFTeam_Blue) {
 			team_remove = -1;
 		} else {
 			team_remove = 0;
 		}
 	}
 	
-	int team_count = team_blu + team_red + team_remove;
+	team_count = team_blu + team_red + team_remove;
 
-	if (team_count == sm_team_joinlimit) {
-		return Plugin_Handled;
+	char clientname[64];
+	char buffer[64] = "client: ";
+	GetClientName(client, clientname, sizeof(clientname));
+	StrCat(buffer, sizeof(buffer), clientname);
+
+	sendDebugMessage("###JoinTeamCommand###");
+	sendDebugMessage(buffer);
+	sendDebugMessage("team_old: %d", team_old);
+	sendDebugMessage("team_new: %d", team_new);
+	sendDebugMessage("team_red: %d", team_red);
+	sendDebugMessage("team_blu: %d", team_blu);
+	sendDebugMessage("team_remove: %d", team_remove);
+	sendDebugMessage("team_count: %d", team_count);
+
+	if (team_count == sm_team_joinlimit.IntValue - 1) {
+		PrintToChatAll("[TL] Teams are no longer full (%d/%d).", team_count, sm_team_joinlimit.IntValue);
+	} else if (team_count == sm_team_joinlimit.IntValue) {
+		PrintToChatAll("[TL] Teams are now full (%d/%d).", team_count, sm_team_joinlimit.IntValue);
 	}
 
+	if (team_count >= sm_team_joinlimit.IntValue + 1) {
+		return Plugin_Handled;
+	}
+	return Plugin_Continue;
 }
 
 public Action EventPlayerTeam(Event event, const char[] name, bool dontBroadcast) {
 	team_red = GetTeamClientCount(2);
 	team_blu = GetTeamClientCount(3);
 
-	TFTeam team_new = view_as<TFTeam>(GetEventInt(event, "team"));
-	TFTeam team_old = view_as<TFTeam>(GetEventInt(event, "oldteam"));
+	team_new = view_as<TFTeam>(GetEventInt(event, "team"));
+	team_old = view_as<TFTeam>(GetEventInt(event, "oldteam"));
+
+	sendDebugMessage("###TeamChangeEvent###");
+	sendDebugMessage("team_old: %d", team_old);
+	sendDebugMessage("team_new: %d", team_new);
+	//sendDebugMessage("team_red: %d", team_red);
+	//sendDebugMessage("team_blu: %d", team_blu);
+}
+
+
+//Functions
+public void sendDebugMessage (const char[] message, any ...) {
+	char buffer[254];
+	sm_tl_debug = FindConVar("sm_tl_debug");
+
+	if (sm_tl_debug.BoolValue) {
+		VFormat(buffer, sizeof(buffer), message, 2);
+		PrintToServer("%s", buffer);
+	}
+}
+
+public int MySortingFunc(int[] a, int[] b, const int[][] table, Handle handle) {
+    int aScore = a[1], bScore = b[1];
+
+    if (aScore > bScore) {
+        return -1;
+    } else if (aScore < bScore) {
+        return 1;
+    }
+    return 0;
+}
+
+bool IsEven(int iNum) {
+    return iNum % 2 == 0;
 }
