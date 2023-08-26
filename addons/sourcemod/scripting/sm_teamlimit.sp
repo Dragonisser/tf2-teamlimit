@@ -69,7 +69,7 @@ public Action Command_LimitInfo(int client, int args) {
 }
 
 public Action Command_SetTeamLimit(int client, int args) {
-	char arg1[32];
+	char arg1[1];
 	GetCmdArg(1, arg1, sizeof(arg1));
 	
 	SetConVarInt(g_Cvar_JoinLimit, StringToInt(arg1));
@@ -81,7 +81,6 @@ public Action Command_SetTeamLimit(int client, int args) {
 }
 
 public Action EventGameStart(Event event, const char[] name, bool dontBroadcast) {
-	
 	g_iTeamRed = GetTeamClientCount(2);
 	g_iTeamBlu = GetTeamClientCount(3);
 	g_iTeamCount = g_iTeamBlu + g_iTeamRed;
@@ -96,7 +95,6 @@ public Action EventGameStart(Event event, const char[] name, bool dontBroadcast)
 }
 
 public Action EventRoundStart(Event event, const char[] name, bool dontBroadcast) {
-	
 	g_iTeamRed = GetTeamClientCount(2);
 	g_iTeamBlu = GetTeamClientCount(3);
 	g_iTeamCount = g_iTeamBlu + g_iTeamRed;
@@ -111,7 +109,6 @@ public Action EventRoundStart(Event event, const char[] name, bool dontBroadcast
 }
 
 public Action OnTeamChangeRequested(int client, const char[] name, int argc) {
-
 	g_iTeamRed = GetTeamClientCount(2);
 	g_iTeamBlu = GetTeamClientCount(3);
 
@@ -176,7 +173,6 @@ public Action OnTeamChangeRequested(int client, const char[] name, int argc) {
 }
 
 public Action EventPlayerTeam(Event event, const char[] name, bool dontBroadcast) {
-	
 	TFTeam teamNew;
 	TFTeam teamOld;
 
@@ -197,15 +193,12 @@ public void CvarHookJoinLimit(Handle cvar, const char[] oldValue, const char[] n
 	HandleJoinLimitChange();
 }
 
-//Functions
-
 public void HandleJoinLimitChange() {
 	int playerOverLimit = g_iTeamCount - g_Cvar_JoinLimit.IntValue;
 
 	if (playerOverLimit > 0) {
 		PrintToChatAll("[TL] Teams are no longer full (%d/%d).", g_iTeamCount, g_Cvar_JoinLimit.IntValue);
 	} else {
-		
 		g_iTeamRed = GetTeamClientCount(2);
 		g_iTeamBlu = GetTeamClientCount(3);
 		g_iTeamCount = g_iTeamBlu + g_iTeamRed;
@@ -262,7 +255,6 @@ public void HandleJoinLimitChange() {
 				}
 			}
 		}
-		
 		PrintToChatAll("[TL] Teams are now full (%d/%d).", g_iTeamCount - playerOverLimit, g_Cvar_JoinLimit.IntValue);
 	}
 }
